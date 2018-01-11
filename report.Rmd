@@ -1,0 +1,296 @@
+---
+title: "Exploratory Data Analysis for Twitter, News and Blog Datasets"
+author: "Simon Merino Ruiz"
+date: "January 8th, 2018"
+output: 
+  html_document:
+    code_folding: hide
+    df_print: paged
+---
+# Exploratory Data Analysis for Twitter, News and Blog Datasets by Simon Merino
+
+This report contains the analysis work done on the Twitter, News and Blogs Datasets provided as part of the assignment for the Final Capstone of the Data Science Specialization in Coursera.
+```{r libraries, include=FALSE}
+library(ggplot2)
+library(tm)
+library(NLP)
+library(stringr)
+library(RWeka)
+library(gridExtra)
+library(knitr)
+library(wordcloud)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Data ingestion.
+Three files are provided, one for Tweets, another one for Blogs texts and a final one for News pieces. Each file contain multiple lines of text, being each one a separate document/tweet.
+For performance consideration a simple sampling is done in the files.
+
+```{r data_ingestion,warning = FALSE}
+# Twitter File
+library(knitr)
+connection <- file("en_US.twitter.txt",open="r")
+twitterLines<-readLines(connection)
+twitterCorp <- SimpleCorpus(VectorSource(twitterLines[1:10000]))
+close(connection)
+
+
+#Blogs File
+connection <- file("en_US.blogs.txt",open="r")
+blogsLines<-readLines(connection)
+blogsCorp <- SimpleCorpus(VectorSource(blogsLines[1:10000]))
+close(connection)
+
+# News File
+connection <- file("en_US.news.txt",open="r")
+newslines<-readLines(connection)
+newsCorp <- SimpleCorpus(VectorSource(newslines[1:10000]))
+close(connection)
+#Summary of read files
+
+summaryTable<-data.frame(row.names=c("TwitterData","BlogsData","NewsData"))
+
+
+summaryTable<-cbind(summaryTable,c(length(twitterLines),length(blogsLines),length(newslines)))
+names(summaryTable)<-"Number_of_lines"
+
+remove(twitterLines)
+remove(blogsLines)
+remove(newslines)
+
+```
+##Data preprocessing
+To get meaningful results, the text is having its stopwords removed. Also a stemming algorithm is applied to consolidate words of the same family into a single one.
+
+```{r data_preprocessing,warning = FALSE}
+#Let´s eliminate stopwords
+
+twitterCorp<-tm_map(twitterCorp,removeWords,stopwords("english"))
+blogsCorp<-tm_map(blogsCorp,removeWords,stopwords("english"))
+newsCorp<-tm_map(newsCorp,removeWords,stopwords("english"))
+
+
+#Now let´s find raw version of every word (stem)
+
+twitterCorp<-tm_map(twitterCorp,stemDocument)
+blogsCorp<-tm_map(blogsCorp,stemDocument)
+newsCorp<-tm_map(newsCorp,stemDocument)
+
+
+```
+##N Grams
+For the future text analysis, 1, 2 and 3-grams are computed separately for each document. Later one, occurences of the same grams are consolidated to enable frequency analysis.
+```{r n_grams,warning = FALSE}
+#1,2 and 3 grams for the 3 corpus under study
+twitter_grams_1 <- NGramTokenizer(twitterCorp, Weka_control(min = 1, max = 1))
+twitter_grams_2 <- NGramTokenizer(twitterCorp, Weka_control(min = 2, max = 2))
+twitter_grams_3 <-NGramTokenizer(twitterCorp, Weka_control(min = 3, max = 3))
+
+blogs_grams_1 <- NGramTokenizer(blogsCorp, Weka_control(min = 1, max = 1))
+blogs_grams_2 <- NGramTokenizer(blogsCorp, Weka_control(min = 2, max = 2))
+blogs_grams_3 <-NGramTokenizer(blogsCorp, Weka_control(min = 3, max = 3))
+
+news_grams_1 <- NGramTokenizer(newsCorp, Weka_control(min = 1, max = 1))
+news_grams_2 <- NGramTokenizer(newsCorp, Weka_control(min = 2, max = 2))
+news_grams_3 <-NGramTokenizer(newsCorp, Weka_control(min = 3, max = 3))
+
+#Summarizing the information
+summaryTable$Total_number_of_1_grams<-c(length(twitter_grams_1),length(blogs_grams_1),length(news_grams_1))
+summaryTable$Total_number_of_2_grams<-c(length(twitter_grams_2),length(blogs_grams_2),length(news_grams_2))
+summaryTable$Total_number_of_3_grams<-c(length(twitter_grams_3),length(blogs_grams_3),length(news_grams_3))
+
+
+```
+
+```{r unique_ngrams,warning = FALSE}
+#Dealing now with unique 1-2-3 grams
+
+twitter_grams_1<-table(twitter_grams_1)
+twitter_grams_2<-table(twitter_grams_2)
+twitter_grams_3<-table(twitter_grams_3)
+
+blogs_grams_1<-table(blogs_grams_1)
+blogs_grams_2<-table(blogs_grams_2)
+blogs_grams_3<-table(blogs_grams_3)
+
+news_grams_1<-table(news_grams_1)
+news_grams_2<-table(news_grams_2)
+news_grams_3<-table(news_grams_3)
+
+#Summarizing the information
+summaryTable$Total_number_of_unique_1_grams<-c(length(twitter_grams_1),length(blogs_grams_1),length(news_grams_1))
+summaryTable$Total_number_of_unique_2_grams<-c(length(twitter_grams_2),length(blogs_grams_2),length(news_grams_2))
+summaryTable$Total_number_of_unique_3_grams<-c(length(twitter_grams_3),length(blogs_grams_3),length(news_grams_3))
+
+```
+
+## Final summary of the data
+This table blow summarizes the main features of the data: Total number of lines (before sampling), Total Number of 1,2 and 3 grams (after sampling) and Total Number of Unique 1,2 and 3 grams (also after sampling)
+
+```{r table,warning = FALSE}
+#kable(summaryTable)
+summaryTable
+```
+## Plots with Ngrams
+Two types of plots are provided, a word cloud with most frequent 1-grams and a frequency distribution of 1,2 and 3 grams for the three different datasets
+```{r plots preparation}
+#Bar Char for TOP N most used words for the 3 documents
+
+twitter_grams_1<-as.data.frame(twitter_grams_1)
+twitter_grams_2<-as.data.frame(twitter_grams_2)
+twitter_grams_3<-as.data.frame(twitter_grams_3)
+
+blogs_grams_1<-as.data.frame(blogs_grams_1)
+blogs_grams_2<-as.data.frame(blogs_grams_2)
+blogs_grams_3<-as.data.frame(blogs_grams_3)
+
+news_grams_1<-as.data.frame(news_grams_1)
+news_grams_2<-as.data.frame(news_grams_2)
+news_grams_3<-as.data.frame(news_grams_3)
+
+
+
+```
+
+##Word Cloud
+
+This is the combined word cloud of 1 grams
+
+```{r combined_word_cloud}
+# combined Word Cloud
+
+#dataframes need to have the same column names
+
+names(blogs_grams_1)[1]<-"gram"
+names(twitter_grams_1)[1]<-"gram"
+names(news_grams_1)[1]<-"gram"
+names(blogs_grams_2)[1]<-"gram"
+names(twitter_grams_2)[1]<-"gram"
+names(news_grams_2)[1]<-"gram"
+names(blogs_grams_3)[1]<-"gram"
+names(twitter_grams_3)[1]<-"gram"
+names(news_grams_3)[1]<-"gram"
+
+
+gram1<-rbind(twitter_grams_1,blogs_grams_1,news_grams_1)
+
+wordcloud(gram1$gram, gram1$Freq,min.freq=10,ordered.colors=TRUE,max.words=50)
+```
+
+
+## Frequency distribution plots
+
+
+This one below is the n-gram plot for Twitter Data
+```{r twitter_plot}
+
+#Sorting the dataframes in descending order
+twitter_grams_1<-twitter_grams_1[order(twitter_grams_1$Freq,decreasing = TRUE),]
+twitter_grams_2<-twitter_grams_2[order(twitter_grams_2$Freq,decreasing = TRUE),]
+twitter_grams_3<-twitter_grams_3[order(twitter_grams_3$Freq,decreasing = TRUE),]
+
+
+blogs_grams_1<-blogs_grams_1[order(blogs_grams_1$Freq,decreasing = TRUE),]
+blogs_grams_2<-blogs_grams_2[order(blogs_grams_2$Freq,decreasing = TRUE),]
+blogs_grams_3<-blogs_grams_3[order(blogs_grams_3$Freq,decreasing = TRUE),]
+
+news_grams_1<-news_grams_1[order(news_grams_1$Freq,decreasing = TRUE),]
+news_grams_2<-news_grams_2[order(news_grams_2$Freq,decreasing = TRUE),]
+news_grams_3<-news_grams_3[order(news_grams_3$Freq,decreasing = TRUE),]
+
+#Take TOP 30 words
+
+twitter_grams_1<-twitter_grams_1[1:30,]
+twitter_grams_2<-twitter_grams_2[1:30,]
+twitter_grams_3<-twitter_grams_3[1:30,]
+
+blogs_grams_1<-blogs_grams_1[1:30,]
+blogs_grams_2<-blogs_grams_2[1:30,]
+blogs_grams_3<-blogs_grams_3[1:30,]
+
+
+news_grams_1<-news_grams_1[1:30,]
+news_grams_2<-news_grams_2[1:30,]
+news_grams_3<-news_grams_3[1:30,]
+#Plot
+
+t1<-ggplot(twitter_grams_1,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+t1<-t1+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 1-Ngrams in Twitter dataset")
+
+t2<-ggplot(twitter_grams_2,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+t2<-t2+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 2-grams in Twitter dataset")
+
+
+t3<-ggplot(twitter_grams_3,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+t3<-t3+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 3-grams in Twitter dataset")
+grid.arrange(t1,t2,t3,nrow=3)
+
+```
+
+
+This one below is the n-gram plot for Blog Data
+```{r blog_plot}
+
+b1<-ggplot(blogs_grams_1,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+b1<-b1+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 1-grams in Blog dataset")
+
+b2<-ggplot(blogs_grams_2,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+b2<-b2+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 2-grams in Blog dataset")
+
+b3<-ggplot(blogs_grams_3,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+b3<-b3+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 3-grams in Blog dataset")
+grid.arrange(b1,b2,b3,nrow=3)
+
+
+```
+
+
+
+This one below is the n-gram plot for News Data
+```{r news_plot}
+n1<-ggplot(news_grams_1,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+n1<-n1+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 1-grams in News dataset")
+
+n2<-ggplot(news_grams_2,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+n2<-n2+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 2-grams in News dataset")
+
+n3<-ggplot(news_grams_3,aes(x=reorder(gram, -Freq),y=Freq)) + geom_bar(stat="identity", fill = "darkblue", colour = "black")
+n3<-n3+theme(axis.text.x = element_text(angle=30, hjust=1))+xlab("Top 3-grams in News dataset")
+
+grid.arrange(n1,n2,n3,nrow=3)
+
+```
+
+
+
+## Common grams
+Finally, grams accross all datasets are compared to find which , out of the frequent terms, are common.
+
+```{r commongrams}
+#Common words in TOP 1000 words
+
+common1grams<-Reduce(intersect,list(twitter_grams_1$gram,news_grams_1$gram, blogs_grams_1$gram))
+common2grams<-Reduce(intersect,list(twitter_grams_2$gram,news_grams_2$gram, blogs_grams_2$gram))
+common3grams<-Reduce(intersect,list(twitter_grams_3$gram,news_grams_3$gram, blogs_grams_3$gram))
+
+common1grams
+common2grams
+common3grams
+```
+
+
+# Plans for prediction algorithm
+With the analyzed data, I will try 2 prediction algorithms. "Simple" 3-gram based solution and Markov chain model. 
+
+The first one seems easier as it will be statically based on the testing data, providing suggestions based on the probability of happening of the 3-gram. 
+
+One of the main challenges of both approaches will be the amount of data that will be processed as it comes at the expense of resources usage. 
+
+Initially it might seem clever to remove many of the empty-meaning words that have shown as most frequent trigrams but that means that they are the words most frequently used by typers.
+
+
+
+
