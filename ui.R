@@ -13,25 +13,22 @@ library(shiny)
 shinyUI(fluidPage(
   
   # Application title
-  titlePanel("Old Faithful Geyser Data"),
+  titlePanel("TEXT PREDICTOR BASED ON TWITTER, BLOGS AND NEWS DATA"),
   
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-       sliderInput("bins",
-                   "Number of bins:",
-                   min = 1,
-                   max = 50,
-                   value = 30),
-       textInput("texto",label=NULL,value="escriba aqui"),
-       submitButton("Update text")
+      h1("Text to predict"),  
+      textInput("texto",label=NULL,value="write here your text"),
+       submitButton("Predict!")
     ),
     
     # Show a plot of the generated distribution
     mainPanel(
-       plotOutput("distPlot"),
-       textOutput("texto_salida"),
-       textOutput("texto_salida2")
+      h1("Most Probable word"), 
+       textOutput("texto_salida3"),
+      h1("Other words worth considering"),
+       plotOutput("plot_salida")
     )
   )
 ))

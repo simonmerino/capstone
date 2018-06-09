@@ -11,22 +11,18 @@ library(shiny)
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
-   
-  # output$distPlot <- renderPlot({
-  #   
-  #   # generate bins based on input$bins from ui.R
-  #   x    <- faithful[, 2] 
-  #   bins <- seq(min(x), max(x), length.out = input$bins + 1)
-  #   
-  #   # draw the histogram with the specified number of bins
-  #   hist(x, breaks = bins, col = 'darkgray', border = 'white')
-  #   
-  # }),
-  output$texto_salida<-renderText({
-    toupper(input$texto)
+   output$texto_salida3<-renderText({
+    #as.character(dt2[1,1])
+    outputtable<-mostfrequenttable(input$texto)
+    outputtable<-removeinput(input$texto,outputtable)
+    as.character(outputtable[1,1])
+    #as.character("prueba")
   })
-  output$texto_salida2<-renderText({
-    tolower(input$texto)
+  output$plot_salida<-renderPlot({
+    outputtable<-mostfrequenttable(input$texto)
+    outputtable<-removeinput(input$texto,outputtable)
+    wordcloud(words=outputtable$ngram,freq=outputtable$count,max.words=20,vfont=c("sans serif","plain"),colors=palette())
+    
   })
   
 })
